@@ -1,0 +1,8 @@
+Flask>=2.0
+requests
+nltk
+newsapi-python
+numpy
+google-generativeai
+python-dotenv
+# eventregistry>=8.0.0 <--- REMOVE or COMMENT OUT
