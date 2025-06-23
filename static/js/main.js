@@ -30,17 +30,17 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
     
-    function escapeHtml(unsafe) {
+    function escapeHtml(unsafe) { // Corrected HTML escaping
         if (unsafe === null || typeof unsafe === 'undefined') return '';
         return unsafe.toString()
-             .replace(/&/g, "&")   // Corrected
-             .replace(/</g, "<")    // Corrected
-             .replace(/>/g, ">")    // Corrected
-             .replace(/"/g, '"')  // Corrected
-             .replace(/'/g, "'"); // Corrected (or ')
+             .replace(/&/g, "&")
+             .replace(/</g, "<")
+             .replace(/>/g, ">")
+             .replace(/"/g, '"')
+             .replace(/'/g, "'") // or '
     }
 
-    function appendToLog(logEntry) { // logEntry is {timestamp, message, level}
+    function appendToLog(logEntry) {
         currentLogEntries.push(logEntry);
         if (currentLogEntries.length > MAX_LOG_ENTRIES) {
             currentLogEntries.shift(); 
@@ -66,10 +66,10 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     updateApiKeysBtn.addEventListener('click', async () => {
+        // ... (remains the same)
         const geminiKeySess = document.getElementById('gemini_key_sess_in').value;
         const newsapiKeySess = document.getElementById('newsapi_key_sess_in').value;
-        // Removed StockData and EventRegistry key inputs from here
-
+        
         const payload = {};
         if (geminiKeySess) payload.gemini_key = geminiKeySess;
         if (newsapiKeySess) payload.newsapi_key = newsapiKeySess;
@@ -102,12 +102,12 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     analysisForm.addEventListener('submit', async function (event) {
+        // ... (remains largely the same until displaySectorResults call)
         event.preventDefault();
         runAnalysisBtn.disabled = true;
         loadingIndicator.style.display = 'block';
         resultsSummaryDiv.innerHTML = '<p>Processing your request...</p>';
         
-        // --- Chart and Details Cleanup ---
         Object.values(sectorSentimentCharts).forEach(chart => {
             if (chart && typeof chart.destroy === 'function') {
                 chart.destroy();
@@ -118,8 +118,6 @@ document.addEventListener('DOMContentLoaded', function () {
             sectorChartsContainer.removeChild(sectorChartsContainer.firstChild);
         }
         sectorDetailsContainer.innerHTML = '';
-        // --- End Cleanup ---
-
         displayErrorMessages([]); 
 
         const formData = new FormData(analysisForm);
@@ -134,7 +132,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         
         const currentTimestamp = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
-        // sector_news_source is now hidden input with value "NewsAPI.org"
         appendToLog({ timestamp: currentTimestamp, message: `Starting ${data.analysis_mode || 'analysis'}... (News Source: ${data.sector_news_source})`, level: "INFO" });
 
         try {
@@ -172,7 +169,6 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     function displaySectorResults(sectorResults) {
-        // Clear containers again (defensive)
         Object.values(sectorSentimentCharts).forEach(chart => {
             if (chart && typeof chart.destroy === 'function') chart.destroy();
         });
@@ -187,12 +183,22 @@ document.addEventListener('DOMContentLoaded', function () {
 
         sectorResults.forEach((sectorData, index) => {
             const analysis = sectorData.gemini_analysis;
+            const avgVaderScore = sectorData.avg_vader_score;
+            const vaderSentimentLabel = sectorData.vader_sentiment_label;
 
             const chartWrapper = document.createElement('div');
             chartWrapper.classList.add('chart-wrapper');
             
             const chartTitle = document.createElement('h4');
-            chartTitle.textContent = `Sentiment Score: ${escapeHtml(sectorData.sector_name)}`;
+            let geminiScoreDisplay = 'N/A';
+            if (analysis && typeof analysis.sentiment_score_llm === 'number') {
+                geminiScoreDisplay = parseFloat(analysis.sentiment_score_llm).toFixed(2);
+            }
+            let vaderScoreDisplay = 'N/A';
+            if (typeof avgVaderScore === 'number') {
+                vaderScoreDisplay = parseFloat(avgVaderScore).toFixed(2);
+            }
+            chartTitle.textContent = `${escapeHtml(sectorData.sector_name)} (LLM: ${geminiScoreDisplay}, VADER Avg: ${vaderScoreDisplay})`;
             chartWrapper.appendChild(chartTitle);
 
             const canvasId = `sectorChart-${index}`;
@@ -201,27 +207,45 @@ document.addEventListener('DOMContentLoaded', function () {
             chartWrapper.appendChild(canvas);
             sectorChartsContainer.appendChild(chartWrapper);
 
+            const chartLabels = [];
+            const chartDataPoints = [];
+            const chartBackgroundColors = [];
+            const chartBorderColors = [];
+
             if (analysis && typeof analysis.sentiment_score_llm === 'number') {
-                const sentimentScore = analysis.sentiment_score_llm;
+                chartLabels.push('LLM');
+                const score = analysis.sentiment_score_llm;
+                chartDataPoints.push(score);
+                chartBackgroundColors.push(score > 0.1 ? 'rgba(75, 192, 192, 0.6)' : score < -0.1 ? 'rgba(255, 99, 132, 0.6)' : 'rgba(201, 203, 207, 0.6)');
+                chartBorderColors.push(score > 0.1 ? 'rgba(75, 192, 192, 1)' : score < -0.1 ? 'rgba(255, 99, 132, 1)' : 'rgba(201, 203, 207, 1)');
+            }
+            if (typeof avgVaderScore === 'number') {
+                chartLabels.push('VADER Avg.');
+                chartDataPoints.push(avgVaderScore);
+                // Different colors for VADER to distinguish if both are shown
+                chartBackgroundColors.push(avgVaderScore > 0.05 ? 'rgba(54, 162, 235, 0.6)' : avgVaderScore < -0.05 ? 'rgba(255, 159, 64, 0.6)' : 'rgba(153, 102, 255, 0.6)'); 
+                chartBorderColors.push(avgVaderScore > 0.05 ? 'rgba(54, 162, 235, 1)' : avgVaderScore < -0.05 ? 'rgba(255, 159, 64, 1)' : 'rgba(153, 102, 255, 1)');
+            }
+
+            if (chartDataPoints.length > 0) {
                 try {
                     const ctx = document.getElementById(canvasId).getContext('2d');
-                    // No need to check sectorSentimentCharts[canvasId] before destroy if we clear the object above
                     sectorSentimentCharts[canvasId] = new Chart(ctx, {
                         type: 'bar',
                         data: {
-                            labels: [escapeHtml(sectorData.sector_name)], 
+                            labels: chartLabels, 
                             datasets: [{
-                                label: 'LLM Sentiment Score',
-                                data: [sentimentScore],
-                                backgroundColor: [sentimentScore > 0.1 ? 'rgba(75, 192, 192, 0.6)' : sentimentScore < -0.1 ? 'rgba(255, 99, 132, 0.6)' : 'rgba(201, 203, 207, 0.6)'],
-                                borderColor: [sentimentScore > 0.1 ? 'rgba(75, 192, 192, 1)' : sentimentScore < -0.1 ? 'rgba(255, 99, 132, 1)' : 'rgba(201, 203, 207, 1)'],
+                                label: 'Sentiment Score',
+                                data: chartDataPoints,
+                                backgroundColor: chartBackgroundColors,
+                                borderColor: chartBorderColors,
                                 borderWidth: 1
                             }]
                         },
                         options: {
                             responsive: true, maintainAspectRatio: false,
                             scales: { y: { beginAtZero: false, min: -1, max: 1, title: { display: true, text: 'Score (-1 to 1)' } } },
-                            plugins: { legend: { display: false } },
+                            plugins: { legend: { display: chartDataPoints.length > 1 } },
                             animation: { duration: 800, easing: 'easeInOutQuart' }
                         }
                     });
@@ -230,11 +254,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     const errorP = document.createElement('p');
                     errorP.textContent = "Error rendering chart.";
                     errorP.classList.add('error-message');
-                    chartWrapper.appendChild(errorP);
+                    chartWrapper.appendChild(errorP); // Add error inside the specific chart wrapper
                 }
             } else {
                  const noScoreP = document.createElement('p');
-                 noScoreP.textContent = "Sentiment score not available or not a number.";
+                 noScoreP.textContent = "Sentiment scores not available for chart.";
                  chartWrapper.appendChild(noScoreP);
             }
 
@@ -245,22 +269,31 @@ document.addEventListener('DOMContentLoaded', function () {
 
             if (sectorData.error_message) {
                 detailHtml += `<p class="error-message"><strong>Error for this sector:</strong> ${escapeHtml(sectorData.error_message)}</p>`;
-            } else if (analysis) {
-                detailHtml += `<p><strong>Overall Sentiment:</strong> ${escapeHtml(analysis.overall_sentiment || 'N/A')} (Score: ${analysis.sentiment_score_llm !== null && typeof analysis.sentiment_score_llm !== 'undefined' ? parseFloat(analysis.sentiment_score_llm).toFixed(2) : 'N/A'})</p>`;
-                detailHtml += `<p><strong>Summary:</strong> ${escapeHtml(analysis.summary || 'N/A')}</p>`;
-                detailHtml += `<p><strong>Reason:</strong> ${escapeHtml(analysis.sentiment_reason || 'N/A')}</p>`;
+            }
+            
+            // Display VADER score and label
+            if (typeof avgVaderScore === 'number') {
+                detailHtml += `<p><strong>VADER Avg. Sentiment:</strong> ${escapeHtml(vaderSentimentLabel || 'N/A')} (Score: ${parseFloat(avgVaderScore).toFixed(3)})</p>`;
+            } else {
+                detailHtml += `<p><strong>VADER Avg. Sentiment:</strong> N/A</p>`;
+            }
+
+            if (analysis) { // Gemini's analysis
+                detailHtml += `<p><strong>LLM Overall Sentiment:</strong> ${escapeHtml(analysis.overall_sentiment || 'N/A')} (Score: ${analysis.sentiment_score_llm !== null && typeof analysis.sentiment_score_llm !== 'undefined' ? parseFloat(analysis.sentiment_score_llm).toFixed(2) : 'N/A'})</p>`;
+                detailHtml += `<p><strong>LLM Summary:</strong> ${escapeHtml(analysis.summary || 'N/A')}</p>`;
+                detailHtml += `<p><strong>LLM Reason:</strong> ${escapeHtml(analysis.sentiment_reason || 'N/A')}</p>`;
                 const createListHtml = (items, listTitle) => {
-                    if (items && Array.isArray(items) && items.length > 0) {
+                    if (items && Array.isArray(items) && items.length > 0 && items.some(item => item.trim() !== '')) { // Check if items are not just empty strings
                         return `<strong>${listTitle}:</strong><ul>${items.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`;
                     } return `<strong>${listTitle}:</strong> N/A`;
                 };
-                detailHtml += createListHtml(analysis.key_themes, 'Key Themes');
-                detailHtml += `<p><strong>Potential Impact:</strong> ${escapeHtml(analysis.potential_impact || 'N/A')}</p>`;
-                detailHtml += createListHtml(analysis.key_companies_mentioned_context, 'Companies in Context');
-                detailHtml += createListHtml(analysis.risks_identified, 'Risks');
-                detailHtml += createListHtml(analysis.opportunities_identified, 'Opportunities');
-            } else {
-                detailHtml += `<p>No analysis data available for this sector (and no specific error reported).</p>`;
+                detailHtml += createListHtml(analysis.key_themes, 'LLM Key Themes');
+                detailHtml += `<p><strong>LLM Potential Impact:</strong> ${escapeHtml(analysis.potential_impact || 'N/A')}</p>`;
+                detailHtml += createListHtml(analysis.key_companies_mentioned_context, 'LLM Companies in Context');
+                detailHtml += createListHtml(analysis.risks_identified, 'LLM Risks');
+                detailHtml += createListHtml(analysis.opportunities_identified, 'LLM Opportunities');
+            } else if (!sectorData.error_message) {
+                detailHtml += `<p>No LLM analysis data available for this sector.</p>`;
             }
             detailItem.innerHTML = detailHtml;
             sectorDetailsContainer.appendChild(detailItem);

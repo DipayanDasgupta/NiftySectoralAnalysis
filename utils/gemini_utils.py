@@ -7,22 +7,160 @@ logger = logging.getLogger(__name__)
 
 NIFTY_SECTORS_QUERY_CONFIG = {
     "Nifty IT": {
-        "newsapi_keywords": ["Information Technology India", "Infosys", "TCS", "Wipro"]
+        "newsapi_keywords": [
+            "Information Technology India", "Infosys", "TCS", "Wipro", "HCL Technologies",
+            "Tech Mahindra", "LTI Mindtree", "software services India", "cloud computing India",
+            "artificial intelligence India", "NASSCOM", "Indian IT exports", "Bengaluru tech"
+        ]
     },
     "Nifty Bank": {
-        "newsapi_keywords": ["Banking India", "HDFC Bank", "ICICI Bank", "RBI"]
+        "newsapi_keywords": [
+            "Banking India", "HDFC Bank", "ICICI Bank", "SBI", "Axis Bank", "Kotak Mahindra Bank",
+            "RBI", "non-performing assets India", "digital banking India", "UPI India",
+            "banking reforms India", "fintech India"
+        ]
     },
     "Nifty Auto": {
-        "newsapi_keywords": ["Automobile industry India", "Maruti Suzuki", "Tata Motors"]
+        "newsapi_keywords": [
+            "Automobile industry India", "Maruti Suzuki", "Tata Motors", "Mahindra & Mahindra",
+            "Bajaj Auto", "Hero MotoCorp", "electric vehicles India", "auto sales India",
+            "auto components India", "FAME scheme India", "BS6 norms India"
+        ]
     },
     "Nifty Pharma": {
-        "newsapi_keywords": ["Pharmaceuticals India", "Sun Pharma", "Dr Reddy's Labs", "Cipla"]
+        "newsapi_keywords": [
+            "Pharmaceuticals India", "Sun Pharma", "Dr Reddy's Labs", "Cipla", "Aurobindo Pharma",
+            "Lupin", "pharma exports India", "generic drugs India", "DCGI", "USFDA India",
+            "pharma R&D India"
+        ]
     },
     "Nifty FMCG": {
-        "newsapi_keywords": ["FMCG India", "Hindustan Unilever", "ITC India"]
+        "newsapi_keywords": [
+            "FMCG India", "Hindustan Unilever", "ITC India", "Nestle India", "Britannia",
+            "Dabur India", "Godrej Consumer", "FMCG sales India", "rural consumption India",
+            "FMCG marketing India", "FMCG e-commerce India"
+        ]
+    },
+    "Nifty Consumer Durables": {
+        "newsapi_keywords": [
+            "Consumer durables India", "Havells India", "Voltas", "Whirlpool India",
+            "Crompton Greaves", "Bajaj Electricals", "home appliances India",
+            "consumer electronics India", "durables sales India", "smart appliances India"
+        ]
+    },
+    "Nifty Financial Services": {
+        "newsapi_keywords": [
+            "Financial services India", "Bajaj Finance", "HDFC Life", "SBI Life Insurance",
+            "Shriram Finance", "Cholamandalam Finance", "NBFC India", "insurance India",
+            "SEBI", "fintech India", "digital finance India"
+        ]
+    },
+    "Nifty Media": {
+        "newsapi_keywords": [
+            "Media India", "Zee Entertainment", "Sun TV Network", "PVR Inox", "Dish TV",
+            "Network18", "digital media India", "OTT India", "media advertising India",
+            "TRAI", "media consumption India"
+        ]
+    },
+    "Nifty Metal": {
+        "newsapi_keywords": [
+            "Metals India", "Tata Steel", "JSW Steel", "Hindalco", "Vedanta", "SAIL",
+            "steel production India", "aluminium India", "mining India", "metal prices India"
+        ]
+    },
+    "Nifty PSU Bank": {
+        "newsapi_keywords": [
+            "Public sector banks India", "State Bank of India", "Bank of Baroda",
+            "Punjab National Bank", "Canara Bank", "Union Bank of India", "RBI",
+            "PSU bank reforms India", "non-performing assets PSU banks", "PSU bank mergers India"
+        ]
+    },
+    "Nifty Private Bank": {
+        "newsapi_keywords": [
+            "Private banks India", "HDFC Bank", "ICICI Bank", "Axis Bank",
+            "Kotak Mahindra Bank", "IndusInd Bank", "RBI", "private bank loans India",
+            "digital banking India", "fintech India"
+        ]
+    },
+    "Nifty Realty": {
+        "newsapi_keywords": [
+            "Real estate India", "DLF", "Godrej Properties", "Oberoi Realty",
+            "Prestige Estates", "Brigade Enterprises", "RERA India", "housing India",
+            "commercial real estate India", "real estate prices India"
+        ]
+    },
+    "Nifty Commodities": {
+        "newsapi_keywords": [
+            "Commodities India", "UltraTech Cement", "Shree Cement", "Pidilite Industries",
+            "Asian Paints", "Grasim Industries", "cement industry India", "chemicals India",
+            "commodities prices India", "commodities exports India"
+        ]
+    },
+    "Nifty Energy": {
+        "newsapi_keywords": [
+            "Energy India", "Reliance Industries", "NTPC", "Power Grid", "Adani Green Energy",
+            "Tata Power", "renewable energy India", "solar energy India", "energy policy India",
+            "energy demand India"
+        ]
+    },
+    "Nifty Infrastructure": {
+        "newsapi_keywords": [
+            "Infrastructure India", "Larsen & Toubro", "Adani Ports", "GMR Infrastructure",
+            "IRB Infrastructure", "KNR Constructions", "roads India", "smart cities India",
+            "infrastructure financing India", "railways India"
+        ]
+    },
+    "Nifty PSE": {
+        "newsapi_keywords": [
+            "Public sector enterprises India", "ONGC", "Coal India", "BHEL", "GAIL India",
+            "IOC", "PSE disinvestment India", "PSE reforms India", "Indian PSE stocks",
+            "PSE earnings India"
+        ]
+    },
+    "Nifty Oil & Gas": {
+        "newsapi_keywords": [
+            "Oil and gas India", "Reliance Industries", "ONGC", "Indian Oil", "BPCL",
+            "HPCL", "GAIL India", "oil exploration India", "gas distribution India",
+            "oil prices India", "LNG India"
+        ]
+    },
+    "Nifty Healthcare": {
+        "newsapi_keywords": [
+            "Healthcare India", "Apollo Hospitals", "Fortis Healthcare", "Max Healthcare",
+            "Metropolis Healthcare", "Dr Lal PathLabs", "hospitals India", "telemedicine India",
+            "healthcare policy India", "diagnostics India"
+        ]
+    },
+    "Nifty Midcap Liquid 15": {
+        "newsapi_keywords": [
+            "Midcap India", "Ashok Leyland", "Bharat Forge", "Container Corporation",
+            "Tata Power", "Godrej Properties", "midcap stocks India", "midcap growth India",
+            "midcap earnings India", "midcap investments India"
+        ]
+    },
+    "Nifty CPSE": {
+        "newsapi_keywords": [
+            "CPSE India", "NTPC", "Power Grid", "Oil India", "NBCC India", "BHEL",
+            "CPSE disinvestment India", "CPSE reforms India", "Indian CPSE stocks",
+            "CPSE earnings India"
+        ]
+    },
+    "Nifty Services Sector": {
+        "newsapi_keywords": [
+            "Services sector India", "Infosys", "HDFC Bank", "Bharti Airtel", "TCS",
+            "ICICI Bank", "IT services India", "financial services India", "telecom India",
+            "services growth India"
+        ]
+    },
+    "Nifty India Manufacturing": {
+        "newsapi_keywords": [
+            "Manufacturing India", "Siemens India", "Cummins India", "ABB India",
+            "Bharat Electronics", "Larsen & Toubro", "make in India", "manufacturing growth India",
+            "industrial manufacturing India", "manufacturing policy India"
+        ]
     }
-    # Add more sectors as needed, only with 'newsapi_keywords'
 }
+
 
 NEWSAPI_INDIA_MARKET_KEYWORDS = ["India", "Indian market", "NSE", "BSE", "Indian economy"]
 

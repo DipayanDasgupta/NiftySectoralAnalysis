@@ -1,8 +1,9 @@
 # utils/newsapi_helpers.py
 import logging
-from newsapi import NewsApiClient # Ensure this is installed: pip install newsapi-python
+from newsapi import NewsApiClient
 import time
 from datetime import timedelta
+from .sentiment_analyzer import get_vader_sentiment_score # Import VADER utility
 
 logger = logging.getLogger(__name__)
 
@@ -14,9 +15,9 @@ def get_newsapi_org_client(api_key, append_log_func=None):
         if level.lower() == 'error': logger.error(full_message)
         elif level.lower() == 'warning': logger.warning(full_message)
         else: logger.info(full_message)
-        if append_log_func: append_log_func(message, level.upper()) # Ensure level is uppercase for UI
+        if append_log_func: append_log_func(message, level.upper())
 
-    if not api_key or api_key == "YOUR_NEWSAPI_ORG_API_KEY_HERE": # Check against generic placeholder
+    if not api_key or api_key == "YOUR_NEWSAPI_ORG_API_KEY_HERE":
         msg = "NewsAPI.org key is missing or a placeholder. Client not initialized."
         _log(msg, 'warning')
         return None, msg
@@ -52,29 +53,27 @@ def fetch_sector_news_newsapi(
         _log(msg, 'warning')
         return [], msg
 
-    # Ensure keywords are properly OR'd and then AND'ed with country terms
-    # Using explicit phrase matching with double quotes for each keyword.
     sector_query_part = f"({' OR '.join(f'\"{k.strip()}\"' for k in sector_keywords_list if k.strip())})"
     country_query_part = f"({' OR '.join(f'\"{k.strip()}\"' for k in country_keywords_list if k.strip())})"
     
-    if sector_query_part == "()": # No valid sector keywords
-        query_string = country_query_part # Fallback to country if sector keywords are empty
-    elif country_query_part == "()": # No valid country keywords (unlikely but handle)
+    if sector_query_part == "()":
+        query_string = country_query_part
+    elif country_query_part == "()":
         query_string = sector_query_part
     else:
         query_string = f"{sector_query_part} AND {country_query_part}"
     
-    if query_string == "()": # If both parts resulted in empty queries
+    if query_string == "()":
         _log("No valid keywords for query construction.", "warning")
         return [], "No valid keywords provided for NewsAPI query."
 
     from_date_str = from_date_obj.strftime('%Y-%m-%d')
     to_date_str = to_date_obj.strftime('%Y-%m-%d')
     
-    articles_data = []
+    articles_data = [] # Will store dicts: {'content', 'date', 'uri', 'source', 'vader_score'}
     error_message_user = None
     
-    page_size_for_api = min(max_articles_to_fetch, 100) # NewsAPI page_size max is 100
+    page_size_for_api = min(max_articles_to_fetch, 100)
 
     _log(f"Fetching news with query: '{query_string}', From: {from_date_str}, To: {to_date_str}, PageSize: {page_size_for_api}", "debug")
 
@@ -102,26 +101,30 @@ def fetch_sector_news_newsapi(
                 if url in unique_urls:
                     _log(f"Skipping duplicate URL: {url}", "debug")
                     continue
-                if url: unique_urls.add(url) # Add only if URL exists to avoid None in set
+                if url: unique_urls.add(url)
 
                 title = article.get('title', "") or ""
                 description = article.get('description', "") or ""
                 
                 content_for_llm = title
                 if description:
-                    if title and not title.endswith(('.', '!', '?')):
+                    if title and not title.endswith(('.', '!', '?')): # Basic concatenation improvement
                         content_for_llm += ". " + description
                     else:
                         content_for_llm += " " + description
                 
-                if content_for_llm.strip() and content_for_llm.strip() != ".":
+                content_for_llm_stripped = content_for_llm.strip()
+                
+                if content_for_llm_stripped and content_for_llm_stripped != ".":
+                    vader_score = get_vader_sentiment_score(content_for_llm_stripped) # Calculate VADER score
                     articles_data.append({
-                        'content': content_for_llm.strip(),
+                        'content': content_for_llm_stripped,
                         'date': article.get('publishedAt', from_date_str).split('T')[0],
-                        'uri': url or '', # Ensure URI is always a string
-                        'source': article.get('source', {}).get('name', 'N/A')
+                        'uri': url or '',
+                        'source': article.get('source', {}).get('name', 'N/A'),
+                        'vader_score': vader_score # Store VADER score
                     })
-            _log(f"Processed and returning {len(articles_data)} unique articles for LLM.", "info")
+            _log(f"Processed and returning {len(articles_data)} unique articles (with VADER scores) for LLM.", "info")
         else:
             api_err_code = all_articles_response.get('code', 'N/A')
             api_err_msg = all_articles_response.get('message', 'Unknown NewsAPI error')
