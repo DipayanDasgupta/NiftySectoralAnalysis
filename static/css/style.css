@@ -220,3 +220,125 @@ hr {
 #sector-details-container .result-item { /* Reuse result-item styling */
     background-color: #f9f9f9;
 }
+.sector-result-item {
+    border-left: 5px solid #007bff; /* Blue border for sectors */
+    margin-bottom: 30px; /* More space between sectors */
+}
+
+.stock-analysis-header {
+    margin-top: 25px;
+    margin-bottom: 15px;
+    color: #28a745; /* Green for stock section header */
+    border-bottom: 1px dashed #ccc;
+    padding-bottom: 5px;
+}
+
+.stock-list-container {
+    padding-left: 20px; /* Indent stock results */
+    margin-top: 10px;
+}
+
+.stock-result-item {
+    background-color: #fcfcfc; /* Slightly different background for stocks */
+    border: 1px solid #e8e8e8;
+    margin-bottom: 15px;
+    padding: 12px; /* Smaller padding for stock items */
+}
+
+.stock-result-item h5 { /* Styling for stock name header */
+    margin-top: 0;
+    margin-bottom: 8px;
+    color: #333; /* Darker color for stock name */
+    font-size: 1.1em;
+}
+
+.stock-result-item p {
+    font-size: 0.9em; /* Smaller text for stock details */
+    margin-bottom: 5px;
+}
+.stock-result-item ul {
+    font-size: 0.9em;
+    padding-left: 20px;
+}
+/* ... your existing styles ... */
+
+.sector-result-item {
+    border-left: 5px solid #007bff;
+    margin-bottom: 30px;
+    padding-bottom: 20px; /* Add some padding at the bottom of the sector item */
+}
+
+.stock-analysis-trigger-container {
+    margin-top: 20px;
+    padding: 15px;
+    background-color: #f9f9f9;
+    border-top: 1px solid #ddd;
+    border-radius: 0 0 5px 5px; /* Rounded bottom corners if sector item is rounded */
+}
+
+.stock-analysis-trigger-container label {
+    font-weight: bold;
+    display: block;
+    margin-bottom: 8px;
+}
+
+.stock-analysis-trigger-container select[multiple] {
+    width: 100%;
+    min-height: 80px; /* Adjust as needed */
+    margin-bottom: 10px;
+}
+
+.run-stock-analysis-btn {
+    background-color: #28a745; /* Green button for stock analysis */
+    display: block; /* Make it a block element */
+    width: auto; /* Or width: 100%; */
+    margin-top: 10px;
+    margin-bottom: 15px; /* Space before stock results area */
+}
+.run-stock-analysis-btn:hover {
+    background-color: #1e7e34;
+}
+
+.stock-results-area {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px dashed #ccc;
+}
+
+
+.stock-analysis-header { /* Already had this, ensure it's styled if used */
+    margin-top: 25px;
+    margin-bottom: 15px;
+    color: #17a2b8; /* Different color for sub-header */
+    border-bottom: 1px dashed #eee;
+    padding-bottom: 5px;
+}
+
+.stock-list-container {
+    padding-left: 10px; /* Slight indent */
+    margin-top: 10px;
+}
+
+.stock-result-item {
+    background-color: #fdfdfd; /* Slightly different background for stocks */
+    border: 1px solid #e0e0e0;
+    margin-bottom: 15px;
+    padding: 12px; 
+    border-left: 3px solid #28a745; /* Green accent for stock items */
+}
+
+.stock-result-item h5 { 
+    margin-top: 0;
+    margin-bottom: 8px;
+    color: #333; 
+    font-size: 1.05em; /* Slightly smaller than H3 */
+}
+
+.stock-result-item p {
+    font-size: 0.9em; 
+    margin-bottom: 5px;
+}
+.stock-result-item ul {
+    font-size: 0.9em;
+    padding-left: 20px;
+}

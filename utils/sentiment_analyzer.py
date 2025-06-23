@@ -10,8 +10,8 @@ try:
     nltk.data.find('sentiment/vader_lexicon.zip')
 except nltk.downloader.DownloadError:
     logger.info("Downloading VADER lexicon for NLTK...")
-    nltk.download('vader_lexicon', quiet=True)
-except Exception as e: # Catch other potential lookup errors (e.g. if nltk_data path is not standard)
+    nltk.download('vader_lexicon', quiet=True) # Set quiet=False for verbose download if issues
+except Exception as e: 
     logger.warning(f"Could not verify NLTK VADER lexicon, attempting download: {e}")
     try:
         nltk.download('vader_lexicon', quiet=True)
@@ -26,14 +26,17 @@ def get_vader_analyzer():
     if _vader_analyzer_instance is None:
         try:
             _vader_analyzer_instance = SentimentIntensityAnalyzer()
-        except LookupError: # This can happen if lexicon is still not found
-            logger.error("VADER lexicon not found. Please ensure it's downloaded. Attempting download again.")
+        except LookupError: 
+            logger.error("VADER lexicon not found after initial check/download attempt. Please ensure it's manually downloaded if issues persist.")
+            # Attempt one more time, non-quietly for visibility
             try:
-                nltk.download('vader_lexicon', quiet=True)
+                logger.info("Attempting NLTK VADER lexicon download again (verbose)...")
+                nltk.download('vader_lexicon', quiet=False)
                 _vader_analyzer_instance = SentimentIntensityAnalyzer()
+                logger.info("VADER lexicon successfully downloaded and analyzer initialized.")
             except Exception as e:
-                logger.error(f"Failed to initialize SentimentIntensityAnalyzer after second attempt: {e}")
-                return None # Critical failure
+                logger.error(f"Critical failure: Failed to initialize SentimentIntensityAnalyzer after second download attempt: {e}")
+                return None 
         except Exception as e:
             logger.error(f"Failed to initialize SentimentIntensityAnalyzer: {e}")
             return None
@@ -76,7 +79,7 @@ def get_sentiment_label_from_score(score, threshold_positive=0.05, threshold_neg
     """
     Categorizes a sentiment score into 'Positive', 'Negative', or 'Neutral'.
     """
-    if not isinstance(score, (int, float)): # Handle None or other non-numeric types
+    if not isinstance(score, (int, float)): 
         return "N/A"
     if score > threshold_positive:
         return "Positive"

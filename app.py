@@ -1,27 +1,17 @@
 # app.py
-print("DEBUG: app.py - Script started") # ADD THIS LINE
-
 import os
 import logging
 from flask import Flask, render_template, request, jsonify, session as flask_session
 from datetime import datetime, timedelta
-# import secrets # This was imported but not used, can be removed if truly unused
 import json
 
-print("DEBUG: app.py - Basic imports done") # ADD THIS LINE
-
-# Import utility modules - only newsapi_helpers and gemini_utils needed now
 from utils import gemini_utils, newsapi_helpers, sentiment_analyzer 
 import config 
 
-print("DEBUG: app.py - utils and config imported") # ADD THIS LINE
-
 app = Flask(__name__)
 app.secret_key = config.FLASK_SECRET_KEY
-print(f"DEBUG: app.py - Flask app initialized. Secret key set: {bool(app.secret_key and app.secret_key != 'change_this_to_a_strong_random_secret_key')}") # ADD THIS LINE
 
-
-# --- Logging Setup ---
+# --- Logging Setup --- (Keep as is)
 logging.basicConfig(
     level=logging.DEBUG, 
     format='%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d (%(funcName)s)] - %(message)s',
@@ -29,59 +19,55 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__) 
 logging.getLogger("werkzeug").setLevel(logging.WARNING)
-logging.getLogger("urllib3").setLevel(logging.WARNING)
-logging.getLogger("newsapi").setLevel(logging.WARNING) 
-logging.getLogger("google").setLevel(logging.WARNING)
-logging.getLogger("nltk").setLevel(logging.INFO) 
-print("DEBUG: app.py - Logging configured") # ADD THIS LINE
+# ... (other library log levels) ...
+logging.getLogger("nltk").setLevel(logging.INFO)
 
 
-# --- API Key Management ---
+# --- API Key Management & Global Clients --- (Keep as is)
 def get_api_keys_from_session_or_config():
-    # print("DEBUG: get_api_keys_from_session_or_config called") # Optional: too verbose for now
     keys = {
         'newsapi': flask_session.get('newsapi_key_sess', config.NEWSAPI_ORG_API_KEY),
         'gemini': flask_session.get('gemini_key_sess', config.GEMINI_API_KEY),
     }
-    # logger.debug(f"API Keys for current request - Gemini Set: {bool(keys['gemini'] and keys['gemini'] != 'YOUR_GEMINI_API_KEY_HERE')}, NewsAPI Set: {bool(keys['newsapi'] and keys['newsapi'] != 'YOUR_NEWSAPI_ORG_API_KEY_HERE')}")
     return keys
 
-# --- Global API Clients/Sessions ---
 newsapi_global_client = None
-
 def get_or_create_newsapi_client_global(api_key_for_check, append_log_local_func):
     global newsapi_global_client
-    if not hasattr(get_or_create_newsapi_client_global, 'current_key'):
-        get_or_create_newsapi_client_global.current_key = None
+    if not hasattr(get_or_create_newsapi_client_global, '_current_newsapi_key'):
+        get_or_create_newsapi_client_global._current_newsapi_key = None
 
-    if newsapi_global_client is None or get_or_create_newsapi_client_global.current_key != api_key_for_check:
+    if newsapi_global_client is None or get_or_create_newsapi_client_global._current_newsapi_key != api_key_for_check:
         append_log_local_func("NEWSAPI_APP: Initializing/Re-initializing global NewsAPI client...", "INFO")
         newsapi_global_client, err = newsapi_helpers.get_newsapi_org_client(api_key_for_check, append_log_local_func)
         if err:
-            get_or_create_newsapi_client_global.current_key = None
+            get_or_create_newsapi_client_global._current_newsapi_key = None 
+            newsapi_global_client = None 
             append_log_local_func(f"NEWSAPI_APP: Failed to initialize client: {err}", "ERROR")
         else:
-            get_or_create_newsapi_client_global.current_key = api_key_for_check
+            get_or_create_newsapi_client_global._current_newsapi_key = api_key_for_check
             append_log_local_func("NEWSAPI_APP: Global NewsAPI client ready.", "INFO")
     return newsapi_global_client
 
-print("DEBUG: app.py - Helper functions defined") # ADD THIS LINE
-
 @app.route('/')
 def index_page():
-    print("DEBUG: app.py - Route / accessed") # ADD THIS LINE
+    # ... (Keep as is) ...
     actual_system_today = datetime.now().date()
+    sector_config = gemini_utils.NIFTY_SECTORS_QUERY_CONFIG
+    # Pass the full config to the template so JS can access stock lists for dynamic dropdowns
     context = {
-        'sector_options': list(gemini_utils.NIFTY_SECTORS_QUERY_CONFIG.keys()),
+        'sector_options': list(sector_config.keys()),
         'news_source_options': ["NewsAPI.org"], 
         'system_actual_today': actual_system_today.strftime('%Y-%m-%d'),
         'default_end_date': actual_system_today.strftime('%Y-%m-%d'),
+        'sector_stock_config_json': json.dumps({sector: list(details.get("stocks", {}).keys()) for sector, details in sector_config.items()})
     }
     return render_template('index.html', **context)
 
+
 @app.route('/api/update-api-keys', methods=['POST'])
 def update_api_keys_route():
-    print("DEBUG: app.py - Route /api/update-api-keys accessed") # ADD THIS LINE
+    # ... (Keep as is) ...
     data = request.json
     keys_updated_messages = []
     log_updates = []
@@ -102,190 +88,228 @@ def update_api_keys_route():
     logger.info(f"API keys update attempt: {'; '.join(log_updates)}")
     return jsonify({"message": "Selected API keys processed for session successfully."})
 
-
-@app.route('/api/sector-analysis', methods=['POST'])
-def perform_sector_analysis_route():
-    print("DEBUG: app.py - Route /api/sector-analysis accessed") # ADD THIS LINE
-    form_data = request.json
-    # ... (rest of the function) ...
-    # YOU CAN ADD MORE DEBUG PRINTS INSIDE THIS LONG FUNCTION IF NEEDED
-    # For now, the print above is enough for this route definition stage
-    loggable_form_data = {k: v for k, v in form_data.items() if 'key' not in k.lower()}
-    logger.info(f"REQUEST DATA: /api/sector-analysis: {json.dumps(loggable_form_data, indent=2)}")
-    
-    ui_log_messages_for_this_request = []
+# --- Helper for ui_log_messages ---
+def setup_local_logger(ui_log_list):
     def append_log_local(message, level='INFO'):
         timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
         level_upper = level.upper()
         entry = {'timestamp': timestamp, 'message': str(message), 'level': level_upper}
-        ui_log_messages_for_this_request.append(entry)
+        ui_log_list.append(entry)
         if level_upper == 'ERROR': logger.error(f"API_LOG_UI: {message}")
         elif level_upper == 'WARNING': logger.warning(f"API_LOG_UI: {message}")
         elif level_upper == 'DEBUG': logger.debug(f"API_LOG_UI: {message}")
         else: logger.info(f"API_LOG_UI: {message}")
+    return append_log_local
 
-    results_payload = []
-    user_facing_errors = []
+@app.route('/api/sector-analysis', methods=['POST'])
+def perform_sector_analysis_route_only(): # Renamed for clarity
+    form_data = request.json
+    loggable_form_data = {k: v for k, v in form_data.items() if 'key' not in k.lower()}
+    logger.info(f"REQUEST DATA: /api/sector-analysis (Sector Only): {json.dumps(loggable_form_data, indent=2)}")
     
+    ui_log_messages_for_this_request = []
+    append_log_local = setup_local_logger(ui_log_messages_for_this_request)
+    
+    results_payload = [] 
+    user_facing_errors = []
     current_api_keys = get_api_keys_from_session_or_config()
 
+    # --- Validation (as before) ---
     selected_sectors = form_data.get('selected_sectors')
     if not selected_sectors or not isinstance(selected_sectors, list) or len(selected_sectors) == 0:
         user_facing_errors.append("Please select at least one sector.")
-    
     if not current_api_keys['gemini'] or current_api_keys['gemini'] == "YOUR_GEMINI_API_KEY_HERE":
-        user_facing_errors.append("Gemini API key is not configured (check session/config).")
-    
+        user_facing_errors.append("Gemini API key is not configured.")
     if not current_api_keys['newsapi'] or current_api_keys['newsapi'] == "YOUR_NEWSAPI_ORG_API_KEY_HERE":
         user_facing_errors.append("NewsAPI.org API key is not configured.")
-
     if user_facing_errors:
-        append_log_local(f"Validation errors: {', '.join(user_facing_errors)}", "ERROR")
         return jsonify({'error': True, 'messages': user_facing_errors, 'logs': ui_log_messages_for_this_request, 'results': []}), 400
 
+    # --- Date and Parameter Setup (as before) ---
     actual_system_today = datetime.now().date()
-    append_log_local(f"Actual system date for this request: {actual_system_today.strftime('%Y-%m-%d')}", "INFO")
-
+    append_log_local(f"Actual system date: {actual_system_today.strftime('%Y-%m-%d')}", "INFO")
     try:
         ui_end_date_str = form_data.get('end_date', actual_system_today.strftime('%Y-%m-%d'))
         ui_selected_end_date_obj = datetime.strptime(ui_end_date_str, '%Y-%m-%d').date()
-        append_log_local(f"UI selected end_date: {ui_selected_end_date_obj.strftime('%Y-%m-%d')}", "INFO")
     except ValueError:
         ui_selected_end_date_obj = actual_system_today
-        append_log_local(f"Invalid end_date format '{ui_end_date_str}', defaulting UI selected end_date to system today: {ui_selected_end_date_obj.strftime('%Y-%m-%d')}", "WARNING")
-
+        append_log_local(f"Invalid end_date format, defaulting to system today: {ui_selected_end_date_obj.strftime('%Y-%m-%d')}", "WARNING")
+    
     lookback_days = int(form_data.get('sector_lookback', 7))
-    max_articles_llm = int(form_data.get('sector_max_articles', 5))
-    custom_prompt = form_data.get('sector_custom_prompt', '')
+    max_articles_llm_sector = int(form_data.get('sector_max_articles', 5))
+    custom_prompt_from_ui = form_data.get('sector_custom_prompt', '')
 
     api_query_end_date_obj = min(ui_selected_end_date_obj, actual_system_today)
     api_query_start_date_obj = api_query_end_date_obj - timedelta(days=lookback_days - 1)
-    
-    llm_context_start_date_obj = ui_selected_end_date_obj - timedelta(days=lookback_days - 1)
-    llm_context_date_range_str = f"{llm_context_start_date_obj.strftime('%Y-%m-%d')} to {ui_selected_end_date_obj.strftime('%Y-%m-%d')}"
-    
-    append_log_local(f"LLM Context Range (user intended): {llm_context_date_range_str}", "INFO")
-    append_log_local(f"FINAL API Query Date Range: {api_query_start_date_obj.strftime('%Y-%m-%d')} to {api_query_end_date_obj.strftime('%Y-%m-%d')}", "INFO")
+    llm_context_date_range_str = f"{(ui_selected_end_date_obj - timedelta(days=lookback_days - 1)).strftime('%Y-%m-%d')} to {ui_selected_end_date_obj.strftime('%Y-%m-%d')}"
+    append_log_local(f"LLM Context Range: {llm_context_date_range_str}", "INFO")
+    append_log_local(f"NewsAPI Query Range: {api_query_start_date_obj.strftime('%Y-%m-%d')} to {api_query_end_date_obj.strftime('%Y-%m-%d')}", "INFO")
 
     na_client = get_or_create_newsapi_client_global(current_api_keys['newsapi'], append_log_local)
-    if not na_client: 
-        user_facing_errors.append("Failed to initialize NewsAPI.org client.")
-        return jsonify({'error': True, 'messages': user_facing_errors, 'logs': ui_log_messages_for_this_request, 'results': []}), 500
+    if not na_client:
+        return jsonify({'error': True, 'messages': ["Failed to initialize NewsAPI client."], 'logs': ui_log_messages_for_this_request, 'results': []}), 500
 
-    for sector_name in selected_sectors:
-        append_log_local(f"--- Processing Sector: {sector_name} using NewsAPI.org ---", "INFO")
-        sector_config_details = gemini_utils.NIFTY_SECTORS_QUERY_CONFIG.get(sector_name, {})
-        fetched_articles_data_list = [] 
-        news_fetch_error_msg = None
+    newsapi_earliest_allowed = actual_system_today - timedelta(days=29)
+    api_query_start_date_obj_constrained = max(api_query_start_date_obj, newsapi_earliest_allowed)
+    if api_query_start_date_obj_constrained > api_query_end_date_obj:
+        # ... (error handling for date range) ...
+        date_error_msg = "NewsAPI query date range invalid after constraints."
+        append_log_local(date_error_msg, "ERROR")
+        return jsonify({'error': True, 'messages': [date_error_msg], 'logs': ui_log_messages_for_this_request, 'results': []}), 400
 
-        api_from_date = api_query_start_date_obj
-        api_to_date = api_query_end_date_obj
+    for sector_name_from_form in selected_sectors:
+        append_log_local(f"--- Processing SECTOR: {sector_name_from_form} ---", "INFO")
+        sector_full_config = gemini_utils.NIFTY_SECTORS_QUERY_CONFIG.get(sector_name_from_form, {})
+        sector_news_api_keywords = sector_full_config.get("newsapi_keywords", [sector_name_from_form])
         
-        newsapi_earliest_allowed = actual_system_today - timedelta(days=29) 
-        na_api_query_start_date_obj_constrained = max(api_from_date, newsapi_earliest_allowed)
+        # --- Sector News Fetching and Analysis (as before) ---
+        fetched_sector_articles_data, sector_news_fetch_error = newsapi_helpers.fetch_sector_news_newsapi(
+            na_client, sector_name_from_form, sector_news_api_keywords, gemini_utils.NEWSAPI_INDIA_MARKET_KEYWORDS,
+            api_query_start_date_obj_constrained, api_query_end_date_obj, max_articles_llm_sector, append_log_local
+        )
+        # ... (VADER and Gemini analysis for sector as before) ...
+        sector_gemini_analysis = None; current_sector_error_message = sector_news_fetch_error
+        sector_article_contents_for_llm = []; sector_vader_scores = []
+        if fetched_sector_articles_data:
+            for art in fetched_sector_articles_data:
+                if art.get('content'): sector_article_contents_for_llm.append(art['content'])
+                if 'vader_score' in art: sector_vader_scores.append(art['vader_score'])
+        avg_vader_score_sector = sentiment_analyzer.get_average_vader_score(sector_vader_scores)
+        vader_label_sector = sentiment_analyzer.get_sentiment_label_from_score(avg_vader_score_sector)
+
+        if not sector_article_contents_for_llm and not sector_news_fetch_error:
+            current_sector_error_message = current_sector_error_message or f"No processable news for sector {sector_name_from_form}."
         
-        if na_api_query_start_date_obj_constrained > api_to_date:
-            news_fetch_error_msg = "NewsAPI date range invalid after applying constraints (start is after end for the query period)."
-            append_log_local(f"[{sector_name}] {news_fetch_error_msg}", "WARNING")
-        else:
-            sector_specific_keywords_na = sector_config_details.get("newsapi_keywords", [sector_name])
-            india_market_keywords_na = gemini_utils.NEWSAPI_INDIA_MARKET_KEYWORDS 
-            
-            append_log_local(f"NewsAPI Call Params for {sector_name}: sector_kws={sector_specific_keywords_na}, country_kws={india_market_keywords_na}, from={na_api_query_start_date_obj_constrained.strftime('%Y-%m-%d')}, to={api_to_date.strftime('%Y-%m-%d')}, max_articles={max_articles_llm}", "DEBUG")
-            
-            fetched_articles_data_list, news_fetch_error_msg = newsapi_helpers.fetch_sector_news_newsapi(
-                newsapi_client=na_client,
-                sector_keywords_list=sector_specific_keywords_na,
-                country_keywords_list=india_market_keywords_na,
-                from_date_obj=na_api_query_start_date_obj_constrained,
-                to_date_obj=api_to_date,
-                max_articles_to_fetch=max_articles_llm,
-                append_log_func=append_log_local
+        if sector_article_contents_for_llm:
+            sector_gemini_analysis, gemini_err = gemini_utils.analyze_news_with_gemini(
+                current_api_keys['gemini'], sector_article_contents_for_llm, sector_name_from_form,
+                llm_context_date_range_str, custom_prompt_from_ui, append_log_local, target_type="sector"
             )
-        if news_fetch_error_msg:
-             append_log_local(f"[{sector_name}] NewsAPI.org Error: {news_fetch_error_msg}", "ERROR")
+            if gemini_err: current_sector_error_message = gemini_err
 
-        gemini_analysis_result_dict = None
-        current_sector_error_message = news_fetch_error_msg
-        
-        sector_vader_scores = []
-        article_contents_for_llm = []
-
-        if fetched_articles_data_list: 
-            for art_data in fetched_articles_data_list:
-                if art_data.get('content'): 
-                    article_contents_for_llm.append(art_data['content'])
-                if 'vader_score' in art_data and isinstance(art_data['vader_score'], (float, int)):
-                    sector_vader_scores.append(art_data['vader_score'])
-        
-        avg_vader_score_for_sector = sentiment_analyzer.get_average_vader_score(sector_vader_scores)
-        vader_sentiment_label = sentiment_analyzer.get_sentiment_label_from_score(avg_vader_score_for_sector)
-        append_log_local(f"[{sector_name}] Average VADER score: {avg_vader_score_for_sector:.4f} ({vader_sentiment_label}) from {len(sector_vader_scores)} articles.", "INFO")
-
-        if news_fetch_error_msg and not article_contents_for_llm: 
-            append_log_local(f"[{sector_name}] News fetch failed and no articles obtained for LLM.", "ERROR")
-            current_sector_error_message = current_sector_error_message or "News fetch failed and no articles obtained for LLM."
-        elif not article_contents_for_llm:
-            msg = "No news articles found by NewsAPI.org with processable content for LLM analysis in the queried date range."
-            append_log_local(f"[{sector_name}] {msg}", "WARNING")
-            current_sector_error_message = current_sector_error_message or msg
-        else:
-            append_log_local(f"[{sector_name}] Analyzing {len(article_contents_for_llm)} articles with Gemini (LLM Context Date: {llm_context_date_range_str}).", "INFO")
-            
-            gemini_analysis_result_dict, gemini_err_str = gemini_utils.analyze_news_with_gemini(
-                _api_key=current_api_keys['gemini'],
-                articles_texts_list=article_contents_for_llm,
-                analysis_target_name=sector_name,
-                date_range_str=llm_context_date_range_str,
-                custom_instructions=custom_prompt,
-                append_log_func=append_log_local
-            )
-            if gemini_err_str:
-                append_log_local(f"[{sector_name}] Gemini analysis error: {gemini_err_str}", "ERROR")
-                current_sector_error_message = gemini_err_str 
-        
         results_payload.append({
-            'sector_name': sector_name,
+            'sector_name': sector_name_from_form,
             'llm_context_date_range': llm_context_date_range_str,
-            'num_articles_for_llm': len(article_contents_for_llm),
-            'gemini_analysis': gemini_analysis_result_dict,
-            'error_message': current_sector_error_message,
-            'avg_vader_score': avg_vader_score_for_sector, 
-            'vader_sentiment_label': vader_sentiment_label 
+            'num_articles_for_llm_sector': len(sector_article_contents_for_llm),
+            'gemini_analysis_sector': sector_gemini_analysis,
+            'error_message_sector': current_sector_error_message,
+            'avg_vader_score_sector': avg_vader_score_sector,
+            'vader_sentiment_label_sector': vader_label_sector,
+            'constituent_stocks': list(sector_full_config.get("stocks", {}).keys()) # Send stock names for UI dropdown
         })
         
-    append_log_local("--- Sector analysis processing finished for all selected sectors. ---", "INFO")
-    
-    return jsonify({
-        'error': False, 
-        'messages': ["Analysis request processed. See sector-specific results and errors."],
-        'results': results_payload,
-        'logs': ui_log_messages_for_this_request
-    })
+    append_log_local("--- Sector-only analysis finished. ---", "INFO")
+    return jsonify({'error': False, 'messages': ["Sector analysis complete."], 'results': results_payload, 'logs': ui_log_messages_for_this_request})
 
-print("DEBUG: app.py - Route definitions done") # ADD THIS LINE
+@app.route('/api/stock-analysis', methods=['POST'])
+def perform_stock_analysis_route():
+    form_data = request.json # Expects: sector_name, selected_stocks_list, end_date, lookback_days, stock_max_articles, custom_prompt
+    logger.info(f"REQUEST DATA: /api/stock-analysis: {json.dumps(form_data, indent=2)}")
+
+    ui_log_messages_for_this_request = []
+    append_log_local = setup_local_logger(ui_log_messages_for_this_request)
+
+    stock_analysis_results = []
+    user_facing_errors = []
+    current_api_keys = get_api_keys_from_session_or_config()
+
+    sector_name = form_data.get('sector_name')
+    selected_stocks = form_data.get('selected_stocks') # This is a list of stock names
+    if not sector_name or not selected_stocks or not isinstance(selected_stocks, list) or len(selected_stocks) == 0:
+        user_facing_errors.append("Sector name and at least one stock must be provided.")
+    # API Key checks (as in sector analysis)
+    if not current_api_keys['gemini'] or current_api_keys['gemini'] == "YOUR_GEMINI_API_KEY_HERE":
+        user_facing_errors.append("Gemini API key is not configured.")
+    if not current_api_keys['newsapi'] or current_api_keys['newsapi'] == "YOUR_NEWSAPI_ORG_API_KEY_HERE":
+        user_facing_errors.append("NewsAPI.org API key is not configured.")
+    if user_facing_errors:
+        return jsonify({'error': True, 'messages': user_facing_errors, 'logs': ui_log_messages_for_this_request, 'results': []}), 400
+    
+    # --- Date and Parameter Setup (mirrors sector analysis, but uses params from this request) ---
+    actual_system_today = datetime.now().date() # Recalculate for this endpoint's context
+    try:
+        ui_end_date_str = form_data.get('end_date', actual_system_today.strftime('%Y-%m-%d'))
+        ui_selected_end_date_obj = datetime.strptime(ui_end_date_str, '%Y-%m-%d').date()
+    except ValueError:
+        ui_selected_end_date_obj = actual_system_today
+    
+    lookback_days = int(form_data.get('lookback_days', 7))
+    max_articles_llm_stock = int(form_data.get('stock_max_articles', 3))
+    custom_prompt_from_ui = form_data.get('custom_prompt', '')
+    
+    api_query_end_date_obj = min(ui_selected_end_date_obj, actual_system_today)
+    api_query_start_date_obj = api_query_end_date_obj - timedelta(days=lookback_days - 1)
+    llm_context_date_range_str = f"{(ui_selected_end_date_obj - timedelta(days=lookback_days - 1)).strftime('%Y-%m-%d')} to {ui_selected_end_date_obj.strftime('%Y-%m-%d')}"
+    append_log_local(f"Stock Analysis - LLM Context: {llm_context_date_range_str}, NewsAPI Query: {api_query_start_date_obj.strftime('%Y-%m-%d')} to {api_query_end_date_obj.strftime('%Y-%m-%d')}", "INFO")
+
+    na_client = get_or_create_newsapi_client_global(current_api_keys['newsapi'], append_log_local)
+    if not na_client:
+        return jsonify({'error': True, 'messages': ["Failed to initialize NewsAPI client for stock analysis."], 'logs': ui_log_messages_for_this_request, 'results': []}), 500
+    
+    newsapi_earliest_allowed = actual_system_today - timedelta(days=29)
+    api_query_start_date_obj_constrained = max(api_query_start_date_obj, newsapi_earliest_allowed)
+    if api_query_start_date_obj_constrained > api_query_end_date_obj:
+        date_error_msg = "NewsAPI query date range invalid for stocks after constraints."
+        append_log_local(date_error_msg, "ERROR")
+        return jsonify({'error': True, 'messages': [date_error_msg], 'logs': ui_log_messages_for_this_request, 'results': []}), 400
+
+    sector_full_config = gemini_utils.NIFTY_SECTORS_QUERY_CONFIG.get(sector_name, {})
+    stocks_master_list_for_sector = sector_full_config.get("stocks", {})
+
+    for stock_name in selected_stocks:
+        if stock_name not in stocks_master_list_for_sector:
+            append_log_local(f"Stock '{stock_name}' not found in configuration for sector '{sector_name}'. Skipping.", "WARNING")
+            stock_analysis_results.append({
+                'stock_name': stock_name, 'error_message_stock': 'Stock not configured for this sector.'
+            })
+            continue
+
+        append_log_local(f"--- Processing Stock: {stock_name} (Sector: {sector_name}) ---", "INFO")
+        stock_specific_news_keywords = stocks_master_list_for_sector.get(stock_name, [stock_name]) # Fallback to stock name
+        
+        # --- Stock News Fetching and Analysis ---
+        fetched_stock_articles_data, stock_news_fetch_error = newsapi_helpers.fetch_stock_news_newsapi(
+            na_client, stock_name, stock_specific_news_keywords, gemini_utils.NEWSAPI_INDIA_MARKET_KEYWORDS,
+            api_query_start_date_obj_constrained, api_query_end_date_obj, max_articles_llm_stock, append_log_local
+        )
+        # ... (VADER and Gemini analysis for stock as in previous combined function) ...
+        stock_gemini_analysis = None; current_stock_error_message = stock_news_fetch_error
+        stock_article_contents_for_llm = []; stock_vader_scores = []
+
+        if fetched_stock_articles_data:
+            for art in fetched_stock_articles_data:
+                if art.get('content'): stock_article_contents_for_llm.append(art['content'])
+                if 'vader_score' in art: stock_vader_scores.append(art['vader_score'])
+        avg_vader_score_stock = sentiment_analyzer.get_average_vader_score(stock_vader_scores)
+        vader_label_stock = sentiment_analyzer.get_sentiment_label_from_score(avg_vader_score_stock)
+
+        if not stock_article_contents_for_llm and not stock_news_fetch_error : # If no articles and no explicit fetch error
+             current_stock_error_message = current_stock_error_message or f"No processable news for stock {stock_name}."
+
+        if stock_article_contents_for_llm:
+            stock_gemini_analysis, gemini_err_stock = gemini_utils.analyze_news_with_gemini(
+                current_api_keys['gemini'], stock_article_contents_for_llm, stock_name,
+                llm_context_date_range_str, custom_prompt_from_ui, append_log_local, target_type="stock"
+            )
+            if gemini_err_stock: current_stock_error_message = gemini_err_stock
+        
+        stock_analysis_results.append({
+            'stock_name': stock_name,
+            'num_articles_for_llm_stock': len(stock_article_contents_for_llm),
+            'gemini_analysis_stock': stock_gemini_analysis,
+            'error_message_stock': current_stock_error_message,
+            'avg_vader_score_stock': avg_vader_score_stock,
+            'vader_sentiment_label_stock': vader_label_stock
+        })
+
+    append_log_local(f"--- Individual stock analysis for sector '{sector_name}' finished. ---", "INFO")
+    return jsonify({'error': False, 'messages': [f"Stock analysis for {sector_name} complete."], 
+                    'results_stocks': stock_analysis_results, # Send only stock results for this call
+                    'sector_name': sector_name, # Include sector name for context on frontend
+                    'logs': ui_log_messages_for_this_request})
+
 
 if __name__ == '__main__':
-    print("DEBUG: app.py - Inside __main__ block") # ADD THIS LINE
     logger.info(f"Sentiment Analysis Dashboard (Flask) starting...")
-    logger.info(f"System Date at Startup: {datetime.now().date().strftime('%Y-%m-%d')}")
-    logger.info(f"Flask Secret Key: {'SET (User Defined)' if config.FLASK_SECRET_KEY and config.FLASK_SECRET_KEY != 'change_this_to_a_strong_random_secret_key' else 'NOT SET (Using default - insecure!)'}")
-    
-    gemini_key_status = 'NOT SET (Using placeholder)'
-    if config.GEMINI_API_KEY and config.GEMINI_API_KEY != "YOUR_GEMINI_API_KEY_HERE":
-         gemini_key_status = f"SET (Ends with ...{config.GEMINI_API_KEY[-4:] if len(config.GEMINI_API_KEY) > 4 else '****'})"
-    logger.info(f"Gemini API Key: {gemini_key_status}")
-
-    newsapi_key_status = 'NOT SET (Using placeholder)'
-    if config.NEWSAPI_ORG_API_KEY and config.NEWSAPI_ORG_API_KEY != "YOUR_NEWSAPI_ORG_API_KEY_HERE":
-        newsapi_key_status = f"SET (Ends with ...{config.NEWSAPI_ORG_API_KEY[-4:] if len(config.NEWSAPI_ORG_API_KEY) > 4 else '****'})"
-    logger.info(f"NewsAPI Key: {newsapi_key_status}")
-    
     port = int(os.environ.get("PORT", 5003)) 
-    print(f"DEBUG: app.py - Attempting to run app on host 0.0.0.0, port {port}") # ADD THIS LINE
     app.run(debug=True, host='0.0.0.0', port=port)
-    print("DEBUG: app.py - app.run finished or was interrupted") # ADD THIS LINE (won't be reached if server runs indefinitely)
-else:
-    print("DEBUG: app.py - Script is being imported, not run directly.") # ADD THIS LINE
-
-print("DEBUG: app.py - Script finished executing (or Flask server was stopped if it ran)") # ADD THIS LINEpython app.py
